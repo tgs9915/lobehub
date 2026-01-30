@@ -247,7 +247,7 @@ const CommandMenu = memo(() => {
   if (!mounted || !isVisible || !appRoot) return null;
 
   return createPortal(
-    <CommandMenuProvider pathname={pathname}>
+    <CommandMenuProvider onClose={handleClose} pathname={pathname}>
       <CommandMenuContent isClosing={isClosing} onClose={handleClose} />
     </CommandMenuProvider>,
     appRoot,
