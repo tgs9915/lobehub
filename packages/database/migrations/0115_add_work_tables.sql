@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS "work_versions" (
 	"snapshot" jsonb NOT NULL,
 	"thumbnail" text,
 	"metadata" jsonb,
+	"cumulative_cost" numeric(20, 6),
+	"cumulative_usage" jsonb,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint

@@ -6,7 +6,7 @@
   },
   "dialect": "postgresql",
   "enums": {},
-  "id": "e8730f16-9f4b-4008-9887-93ff6dee72f7",
+  "id": "8f3b6573-7b7d-41b3-8261-7b8aa0710b4d",
   "policies": {},
   "prevId": "d65bcc8b-fc15-41e7-8678-0c9d603f213d",
   "roles": {},
@@ -21787,6 +21787,18 @@
         },
         "metadata": {
           "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cumulative_cost": {
+          "name": "cumulative_cost",
+          "type": "numeric(20, 6)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cumulative_usage": {
+          "name": "cumulative_usage",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false

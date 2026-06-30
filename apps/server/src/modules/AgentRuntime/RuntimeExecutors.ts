@@ -119,6 +119,7 @@ import {
 import { archiveToolResultIfNeeded } from '@/server/services/toolExecution/archiveToolResult';
 import { toAgentContextDocuments } from '@/utils/agentDocumentContextMapping';
 import { nanoid } from '@/utils/uuid';
+import { buildWorkVersionCumulativeUsage } from '@/utils/workCumulativeUsage';
 
 import { dispatchClientTool } from './dispatchClientTool';
 import { formatErrorEventData } from './formatErrorEventData';
@@ -316,6 +317,34 @@ const attachWorkSourceMessage = async ({
     });
   } catch (error) {
     log('attachWorkSourceMessage failed for toolCallId=%s: %O', sourceToolCallId, error);
+  }
+};
+
+const updateWorkVersionCumulativeUsage = async ({
+  rootOperationId,
+  serverDB,
+  sourceToolCallId,
+  state,
+  userId,
+  workspaceId,
+}: {
+  rootOperationId?: string;
+  serverDB: LobeChatDatabase;
+  sourceToolCallId?: string;
+  state: Pick<AgentState, 'cost' | 'usage'>;
+  userId?: string;
+  workspaceId?: string;
+}) => {
+  if (!rootOperationId || !sourceToolCallId || !userId) return;
+
+  try {
+    await new WorkModel(serverDB, userId, workspaceId).updateVersionCumulativeUsage({
+      rootOperationId,
+      sourceToolCallId,
+      ...buildWorkVersionCumulativeUsage({ cost: state.cost, usage: state.usage }),
+    });
+  } catch (error) {
+    log('updateWorkVersionCumulativeUsage failed for toolCallId=%s: %O', sourceToolCallId, error);
   }
 };
 
@@ -3145,6 +3174,15 @@ export const createRuntimeExecutors = (
         newState.usage = usage;
         if (cost) newState.cost = cost;
 
+        await updateWorkVersionCumulativeUsage({
+          rootOperationId: operationId,
+          serverDB: ctx.serverDB,
+          sourceToolCallId: chatToolPayload.id,
+          state: newState,
+          userId: ctx.userId,
+          workspaceId: state.metadata?.workspaceId ?? ctx.workspaceId,
+        });
+
         // Persist ToolsActivator discovery results to state.activatedStepTools
         const discoveredTools = executionResult.state?.activatedTools as
           | Array<{ identifier: string }>
@@ -3776,6 +3814,15 @@ export const createRuntimeExecutors = (
         });
         newState.usage = usage;
         if (cost) newState.cost = cost;
+
+        await updateWorkVersionCumulativeUsage({
+          rootOperationId: operationId,
+          serverDB: ctx.serverDB,
+          sourceToolCallId: result.toolCallId,
+          state: newState,
+          userId: ctx.userId,
+          workspaceId: state.metadata?.workspaceId ?? ctx.workspaceId,
+        });
       }
     }
 
