@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useCurrentModelNotice } from './useCurrentModelNotice';
+import { useChatInputNotice } from './useChatInputNotice';
 
 interface TestModel {
   abilities?: {
@@ -17,7 +17,8 @@ interface TestProviderWithModels {
 
 const testState = vi.hoisted(() => ({
   agent: {
-    agencyConfig: undefined as { heterogeneousProvider?: { type: string } } | undefined,
+    agencyConfig: undefined as
+      { executionTarget?: string; heterogeneousProvider?: { type: string } } | undefined,
     enableAgentMode: true,
     model: 'gpt-4o',
     provider: 'openai',
@@ -26,9 +27,16 @@ const testState = vi.hoisted(() => ({
     enabledChatModelList: [] as TestProviderWithModels[],
     isInitAiProviderRuntimeState: false,
   },
+  isDesktop: false,
 }));
 
 type StoreSelector<T = unknown, S = Record<PropertyKey, unknown>> = (state: S) => T;
+
+vi.mock('@lobechat/const', () => ({
+  get isDesktop() {
+    return testState.isDesktop;
+  },
+}));
 
 vi.mock('@/features/ChatInput/hooks/useAgentId', () => ({
   useAgentId: () => 'agent-id',
@@ -45,6 +53,7 @@ vi.mock('@/store/agent', () => ({
 
 vi.mock('@/store/agent/selectors', () => ({
   agentByIdSelectors: {
+    getAgencyConfigById: () => (s: typeof testState.agent) => s.agencyConfig,
     getAgentEnableModeById: () => (s: typeof testState.agent) => s.enableAgentMode,
     getAgentModelById: () => (s: typeof testState.agent) => s.model,
     getAgentModelProviderById: () => (s: typeof testState.agent) => s.provider,
@@ -61,7 +70,7 @@ vi.mock('@/store/aiInfra', () => ({
     selector(testState.aiInfra),
 }));
 
-describe('useCurrentModelNotice', () => {
+describe('useChatInputNotice', () => {
   beforeEach(() => {
     testState.agent.agencyConfig = undefined;
     testState.agent.enableAgentMode = true;
@@ -69,10 +78,11 @@ describe('useCurrentModelNotice', () => {
     testState.agent.provider = 'openai';
     testState.aiInfra.enabledChatModelList = [];
     testState.aiInfra.isInitAiProviderRuntimeState = false;
+    testState.isDesktop = false;
   });
 
   it('does not return a notice before the model runtime config is ready', () => {
-    const { result } = renderHook(() => useCurrentModelNotice());
+    const { result } = renderHook(() => useChatInputNotice());
 
     expect(result.current).toBeUndefined();
   });
@@ -81,9 +91,9 @@ describe('useCurrentModelNotice', () => {
     testState.agent.enableAgentMode = false;
     testState.aiInfra.isInitAiProviderRuntimeState = true;
 
-    const { result } = renderHook(() => useCurrentModelNotice());
+    const { result } = renderHook(() => useChatInputNotice());
 
-    expect(result.current).toBe('input.modelUnavailable');
+    expect(result.current).toEqual({ key: 'input.modelUnavailable', type: 'warning' });
   });
 
   it('returns unsupported tool-use copy only when agent mode is enabled and the selected model exists but lacks tool calls', () => {
@@ -92,9 +102,9 @@ describe('useCurrentModelNotice', () => {
       { children: [{ abilities: { functionCall: false }, id: 'gpt-4o' }], id: 'openai' },
     ];
 
-    const { result } = renderHook(() => useCurrentModelNotice());
+    const { result } = renderHook(() => useChatInputNotice());
 
-    expect(result.current).toBe('input.agentModeUnsupportedModel');
+    expect(result.current).toEqual({ key: 'input.agentModeUnsupportedModel', type: 'warning' });
   });
 
   it('returns unavailable model copy when the selected model is enabled globally but absent from the chat selector list', () => {
@@ -103,9 +113,9 @@ describe('useCurrentModelNotice', () => {
       { children: [{ abilities: { functionCall: true }, id: 'gpt-image-1' }], id: 'openai' },
     ];
 
-    const { result } = renderHook(() => useCurrentModelNotice());
+    const { result } = renderHook(() => useChatInputNotice());
 
-    expect(result.current).toBe('input.modelUnavailable');
+    expect(result.current).toEqual({ key: 'input.modelUnavailable', type: 'warning' });
   });
 
   it('does not return unsupported tool-use copy when agent mode is disabled', () => {
@@ -115,7 +125,7 @@ describe('useCurrentModelNotice', () => {
       { children: [{ abilities: { functionCall: false }, id: 'gpt-4o' }], id: 'openai' },
     ];
 
-    const { result } = renderHook(() => useCurrentModelNotice());
+    const { result } = renderHook(() => useChatInputNotice());
 
     expect(result.current).toBeUndefined();
   });
@@ -126,17 +136,76 @@ describe('useCurrentModelNotice', () => {
       { children: [{ abilities: { functionCall: true }, id: 'gpt-4o' }], id: 'openai' },
     ];
 
-    const { result } = renderHook(() => useCurrentModelNotice());
+    const { result } = renderHook(() => useChatInputNotice());
 
     expect(result.current).toBeUndefined();
   });
 
-  it('does not return a notice for heterogeneous agents', () => {
+  it('does not return a model notice for heterogeneous agents', () => {
     testState.agent.agencyConfig = { heterogeneousProvider: { type: 'codex' } };
     testState.aiInfra.isInitAiProviderRuntimeState = true;
 
-    const { result } = renderHook(() => useCurrentModelNotice());
+    const { result } = renderHook(() => useChatInputNotice());
 
     expect(result.current).toBeUndefined();
+  });
+
+  it('returns the sandbox tip on desktop when the cloud sandbox is selected', () => {
+    testState.isDesktop = true;
+    testState.agent.agencyConfig = { executionTarget: 'sandbox' };
+    testState.aiInfra.isInitAiProviderRuntimeState = true;
+    testState.aiInfra.enabledChatModelList = [
+      { children: [{ abilities: { functionCall: true }, id: 'gpt-4o' }], id: 'openai' },
+    ];
+
+    const { result } = renderHook(() => useChatInputNotice());
+
+    expect(result.current).toEqual({
+      action: 'switchToLocal',
+      key: 'input.sandboxModeNotice',
+      type: 'info',
+    });
+  });
+
+  it('does not return the sandbox tip off desktop even when the sandbox is selected', () => {
+    testState.isDesktop = false;
+    testState.agent.agencyConfig = { executionTarget: 'sandbox' };
+    testState.aiInfra.isInitAiProviderRuntimeState = true;
+    testState.aiInfra.enabledChatModelList = [
+      { children: [{ abilities: { functionCall: true }, id: 'gpt-4o' }], id: 'openai' },
+    ];
+
+    const { result } = renderHook(() => useChatInputNotice());
+
+    expect(result.current).toBeUndefined();
+  });
+
+  it('shows the sandbox tip for heterogeneous agents that selected the sandbox', () => {
+    testState.isDesktop = true;
+    testState.agent.agencyConfig = {
+      executionTarget: 'sandbox',
+      heterogeneousProvider: { type: 'codex' },
+    };
+    testState.aiInfra.isInitAiProviderRuntimeState = true;
+
+    const { result } = renderHook(() => useChatInputNotice());
+
+    expect(result.current).toEqual({
+      action: 'switchToLocal',
+      key: 'input.sandboxModeNotice',
+      type: 'info',
+    });
+  });
+
+  it('prioritizes the model warning over the sandbox tip when both apply', () => {
+    testState.isDesktop = true;
+    testState.agent.enableAgentMode = false;
+    testState.agent.agencyConfig = { executionTarget: 'sandbox' };
+    testState.aiInfra.isInitAiProviderRuntimeState = true;
+    // selected model absent from the chat selector → modelUnavailable
+
+    const { result } = renderHook(() => useChatInputNotice());
+
+    expect(result.current).toEqual({ key: 'input.modelUnavailable', type: 'warning' });
   });
 });
