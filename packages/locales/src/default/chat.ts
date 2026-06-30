@@ -921,6 +921,15 @@ export default {
   'taskDetail.topicMenu.stopConfirm.title': 'Stop Run?',
   'taskDetail.topicSource': 'From {{identifier}}',
   'taskDetail.updateFailed': 'Failed to update task',
+  'taskDetail.publishToWorkspace.menuLabel': 'Publish to Workspace',
+  'taskDetail.publishToWorkspace.confirmTitle': 'Publish task to workspace?',
+  'taskDetail.publishToWorkspace.confirmContent':
+    'Once published, this task becomes visible to all workspace members and cannot be reverted to private.',
+  'taskDetail.publishToWorkspace.confirmHint':
+    'Past runs remain private. Only runs created after publishing will be visible to workspace members.',
+  'taskDetail.publishToWorkspace.confirmOk': 'Publish',
+  'taskDetail.publishToWorkspace.errorPrivateAgent':
+    'This task is assigned to a private agent. Reassign to a workspace agent, or publish the agent first.',
 
   'createTask.assignee': 'Assignee',
   'createTask.collapse': 'Hide input',

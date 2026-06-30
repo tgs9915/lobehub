@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { getTestDB } from '../../core/getTestDB';
 import { agents, briefs, documents, tasks, topics, users, workspaces } from '../../schemas';
+import { taskTopics } from '../../schemas/task';
 import type { LobeChatDatabase } from '../../type';
 import { TaskModel } from '../task';
 
@@ -2005,7 +2006,13 @@ describe('TaskModel', () => {
       expect(await bob.getComments(publicTask.id)).toHaveLength(1);
     });
 
-    it('should cascade updateVisibility into task_comments', async () => {
+    it('should NOT cascade updateVisibility into historical task_comments (LOBE-11028)', async () => {
+      // Comments are event-shaped historical rows whose visibility is fixed at
+      // write time. Promoting the parent task to public must not retroactively
+      // expose discussions that took place while the task was private — that
+      // would let other workspace members read messages the commenter intended
+      // for the private context. Comments written *after* promotion inherit
+      // 'public' through their own create path and surface normally.
       const alice = new TaskModel(serverDB, userId, wsId);
       const bob = new TaskModel(serverDB, userId2, wsId);
 
@@ -2015,7 +2022,7 @@ describe('TaskModel', () => {
       });
       await alice.addComment({
         authorUserId: userId,
-        content: 'thoughts',
+        content: 'private-era thoughts',
         taskId: task.id,
         userId,
       });
@@ -2025,8 +2032,63 @@ describe('TaskModel', () => {
 
       await alice.updateVisibility(task.id, 'public');
 
-      // After promotion both task and comment surface to Bob
+      // Task is public now (Bob sees it), but the historical comment stays
+      // hidden — its row still has visibility='private'.
+      expect((await bob.list()).tasks.map((t) => t.id)).toContain(task.id);
+      expect(await bob.getComments(task.id)).toHaveLength(0);
+      // Owner (Alice) of course still sees her own comment.
+      expect(await alice.getComments(task.id)).toHaveLength(1);
+
+      // A new comment written after promotion inherits 'public' and is
+      // visible to Bob — the non-cascade only protects the past, not the
+      // future.
+      await alice.addComment({
+        authorUserId: userId,
+        content: 'post-promotion ping',
+        taskId: task.id,
+        userId,
+      });
       expect(await bob.getComments(task.id)).toHaveLength(1);
+    });
+
+    it('should NOT cascade updateVisibility into historical task_topics (LOBE-11028)', async () => {
+      // Same rationale as comments: a task_topics row records one run of the
+      // task. Its visibility is fixed at write time; promoting the task to
+      // public must not retroactively expose runs (transcripts, handoffs,
+      // review scores) created while the task was private.
+      const alice = new TaskModel(serverDB, userId, wsId);
+
+      const task = await alice.create({
+        instruction: 'will be promoted',
+        visibility: 'private',
+      });
+
+      // Seed a historical run row directly — no model API for taskTopics
+      // outside the runtime path, and inserting raw is precise enough for
+      // asserting the non-cascade invariant.
+      const historicalTopicId = await createTopic('historical-run-topic-id');
+      await serverDB.insert(taskTopics).values({
+        seq: 1,
+        status: 'completed',
+        taskId: task.id,
+        topicId: historicalTopicId,
+        userId,
+        visibility: 'private',
+        workspaceId: wsId,
+      });
+
+      await alice.updateVisibility(task.id, 'public');
+
+      // Task itself is public now.
+      expect((await alice.findById(task.id))?.visibility).toBe('public');
+
+      // But the historical run row keeps its private visibility — it was
+      // recorded during the private phase and stays there.
+      const [historical] = await serverDB
+        .select({ visibility: taskTopics.visibility })
+        .from(taskTopics)
+        .where(eq(taskTopics.taskId, task.id));
+      expect(historical.visibility).toBe('private');
     });
 
     it('should narrow list() to private tasks when visibility filter is set', async () => {

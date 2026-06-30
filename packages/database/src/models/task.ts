@@ -26,7 +26,7 @@ import { merge } from '@/utils/merge';
 
 import { documents } from '../schemas/file';
 import type { NewTaskComment, TaskCommentItem } from '../schemas/task';
-import { taskComments, taskDependencies, taskDocuments, tasks, taskTopics } from '../schemas/task';
+import { taskComments, taskDependencies, taskDocuments, tasks } from '../schemas/task';
 import type { LobeChatDatabase } from '../type';
 import { buildWorkspaceWhere } from '../utils/workspace';
 
@@ -255,11 +255,20 @@ export class TaskModel {
   }
 
   /**
-   * Promote / demote a task and its full subtree to a new visibility. Cascades
-   * inside a single transaction:
-   *   - the root task and every descendant in `tasks` get the new visibility;
-   *   - all rows in `task_dependencies` / `task_documents` / `task_topics`
-   *     whose `task_id` is in the set are updated in lockstep.
+   * Promote a task and its full subtree to a new visibility. Combined with the
+   * router-level guard (LOBE-11027), the only legal transition is
+   * `private → public` — there is no `public → private` path.
+   *
+   * Cascades inside a single transaction across structural rows only:
+   *   - the root task and every descendant in `tasks`;
+   *   - `task_dependencies` and `task_documents` whose `task_id` is in the set.
+   *
+   * `task_topics` and `task_comments` are deliberately **not** cascaded
+   * (LOBE-11028). They are event-shaped historical rows whose visibility was
+   * fixed at write time; promoting the task to public must not retroactively
+   * expose runs and discussions that happened while the task was private.
+   * Topics / comments created after promotion inherit the task's then-current
+   * visibility through their own create paths.
    *
    * Returns `null` if the root task is not visible to the current caller
    * (either missing or owned by another workspace member). Callers should
@@ -305,28 +314,6 @@ export class TaskModel {
         .update(taskDocuments)
         .set({ visibility })
         .where(and(inArray(taskDocuments.taskId, taskIds), this.docsOwnership()));
-
-      await tx
-        .update(taskTopics)
-        .set({ visibility })
-        .where(
-          and(
-            inArray(taskTopics.taskId, taskIds),
-            buildWorkspaceWhere(
-              { userId: this.userId, workspaceId: this.workspaceId },
-              {
-                userId: taskTopics.userId,
-                visibility: taskTopics.visibility,
-                workspaceId: taskTopics.workspaceId,
-              },
-            ),
-          ),
-        );
-
-      await tx
-        .update(taskComments)
-        .set({ visibility })
-        .where(and(inArray(taskComments.taskId, taskIds), this.commentsOwnership()));
 
       return updated ?? null;
     });
