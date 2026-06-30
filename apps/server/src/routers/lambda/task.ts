@@ -12,6 +12,8 @@ import { TaskModel } from '@/database/models/task';
 import { TaskTopicModel } from '@/database/models/taskTopic';
 import { TopicModel } from '@/database/models/topic';
 import { workspaceMembers } from '@/database/schemas';
+import type { LobeChatDatabase } from '@/database/type';
+import { assertAgentUsableBy } from '@/database/utils/agent-access';
 import { router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { EditLockService } from '@/server/services/editLock';
@@ -137,17 +139,23 @@ async function resolveOrThrow(model: TaskModel, id: string) {
 }
 
 async function assertAssigneeAgentBelongsToUser(
-  model: AgentModel,
+  db: LobeChatDatabase,
+  callerCtx: { userId: string; workspaceId?: string },
   assigneeAgentId?: string | null,
 ) {
   if (!assigneeAgentId) return;
 
-  const exists = await model.existsById(assigneeAgentId);
-  if (!exists) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Assignee agent not found',
-    });
+  try {
+    await assertAgentUsableBy(db, assigneeAgentId, callerCtx);
+  } catch (error) {
+    if (error instanceof TRPCError && error.code === 'NOT_FOUND') {
+      // Preserve the task-context message so the UI surfaces "Assignee agent
+      // not found" instead of the generic "Agent not found". Cross-user access
+      // to a private agent still resolves to NOT_FOUND, never FORBIDDEN, so we
+      // don't leak existence of someone else's private agent.
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Assignee agent not found' });
+    }
+    throw error;
   }
 }
 
@@ -246,7 +254,11 @@ export const taskRouter = router({
       try {
         const model = ctx.taskModel;
         const task = await resolveOrThrow(model, input.id);
-        await assertAssigneeAgentBelongsToUser(ctx.agentModel, input.authorAgentId);
+        await assertAssigneeAgentBelongsToUser(
+          ctx.serverDB,
+          { userId: ctx.userId, workspaceId: ctx.workspaceId ?? undefined },
+          input.authorAgentId,
+        );
         const comment = await model.addComment({
           authorAgentId: input.authorAgentId,
           authorUserId: input.authorAgentId ? undefined : ctx.userId,
@@ -994,7 +1006,11 @@ export const taskRouter = router({
     const { id, parentTaskId, ...data } = input;
     try {
       const model = ctx.taskModel;
-      await assertAssigneeAgentBelongsToUser(ctx.agentModel, data.assigneeAgentId);
+      await assertAssigneeAgentBelongsToUser(
+        ctx.serverDB,
+        { userId: ctx.userId, workspaceId: ctx.workspaceId ?? undefined },
+        data.assigneeAgentId,
+      );
       const resolved = await resolveOrThrow(model, id);
 
       // Collaborative edit lock: reject writes to a workspace task another member

@@ -480,9 +480,12 @@ export class TaskService {
 
   private async assertAssigneeAgentBelongsToUser(assigneeAgentId?: string | null): Promise<void> {
     if (!assigneeAgentId) return;
+    // `existsById` already applies the workspace + visibility predicate, so a
+    // cross-user private agent never resolves. NOT_FOUND (not BAD_REQUEST or
+    // FORBIDDEN) keeps every private-agent leak path returning the same code.
     const exists = await this.agentModel.existsById(assigneeAgentId);
     if (!exists) {
-      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Assignee agent not found' });
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Assignee agent not found' });
     }
   }
 

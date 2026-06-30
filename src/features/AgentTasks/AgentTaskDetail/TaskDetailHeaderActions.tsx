@@ -51,6 +51,7 @@ const TaskDetailHeaderActions = memo(() => {
     if (!canEditTask) return;
     if (!taskId) return;
     confirmModal({
+      cancelText: t('cancel', { ns: 'common' }),
       content: (
         <>
           <div>{t('taskDetail.publishToWorkspace.confirmContent')}</div>

@@ -1,3 +1,4 @@
+import { TRPCError } from '@trpc/server';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 
 import type {
@@ -251,7 +252,56 @@ export class ChatGroupModel {
     agentIds: string[],
   ): Promise<{ added: NewChatGroupAgent[]; existing: string[] }> {
     const group = await this.findById(groupId);
-    if (!group) throw new Error('Group not found');
+    if (!group) throw new TRPCError({ code: 'NOT_FOUND', message: 'Group not found' });
+
+    // Composite visibility rule for group membership:
+    // - A caller-owned private group may admit the caller's own private agents
+    //   alongside public ones.
+    // - Any public group, or any group the caller doesn't own, must contain
+    //   only public agents — even the caller's own private agent can't be
+    //   added, because that would expose it to the other members.
+    // `findById` already scopes by visibility, so reaching here with
+    // `group.visibility === 'private'` implies `group.userId === this.userId`.
+    const allowPrivateMembers = group.visibility === 'private' && group.userId === this.userId;
+
+    if (agentIds.length > 0) {
+      // Resolve each requested agent through the workspace + visibility
+      // predicate so another user's private agent never enters this set; it
+      // simply doesn't match the row filter, and we surface NOT_FOUND below.
+      const visibleAgents = await this.db
+        .select({
+          id: agents.id,
+          userId: agents.userId,
+          visibility: agents.visibility,
+        })
+        .from(agents)
+        .where(
+          and(
+            inArray(agents.id, agentIds),
+            buildWorkspaceWhere(
+              { userId: this.userId, workspaceId: this.workspaceId },
+              {
+                userId: agents.userId,
+                workspaceId: agents.workspaceId,
+                visibility: agents.visibility,
+              },
+            ),
+          ),
+        );
+
+      const visibleById = new Map(visibleAgents.map((row) => [row.id, row]));
+      for (const agentId of agentIds) {
+        const row = visibleById.get(agentId);
+        if (!row) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Agent not found' });
+        }
+        if (row.visibility === 'private' && !allowPrivateMembers) {
+          // Caller owns this private agent (visibility predicate would have
+          // hidden it otherwise) but the group can't hold private members.
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Agent not found' });
+        }
+      }
+    }
 
     const existingAgents = await this.getGroupAgents(groupId);
     const existingAgentIds = new Set(existingAgents.map((a) => a.agentId));
