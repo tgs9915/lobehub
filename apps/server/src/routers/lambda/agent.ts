@@ -72,15 +72,33 @@ export const agentRouter = router({
       z.object({
         config: CreateAgentSchema.optional(),
         groupId: z.string().optional(),
+        visibility: z.enum(['private', 'public']).optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
       const agent = await ctx.agentModel.create({
         ...input.config,
         sessionGroupId: input.groupId,
+        // Router-level `visibility` wins over any nested config value so the
+        // sidebar's "Create in Private" entry can't be overridden by a stale
+        // default config.
+        ...(input.visibility ? { visibility: input.visibility } : {}),
       });
 
       return { agentId: agent.id };
+    }),
+
+  /**
+   * Publish a private agent into the workspace. **One-way** — once an agent
+   * is shared, workspace members may already depend on it, so it can't slip
+   * back to `private`. Only the creator of a still-private agent can run
+   * this; the underlying SQL enforces both rules.
+   */
+  publishAgentToWorkspace: agentProcedure
+    .use(withScopedPermission('agent:update'))
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      return ctx.agentModel.publishToWorkspace(input.id);
     }),
 
   createAgentFiles: agentProcedure

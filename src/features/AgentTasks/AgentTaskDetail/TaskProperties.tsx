@@ -3,12 +3,15 @@ import { Block, Text } from '@lobehub/ui';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useActiveWorkspaceId } from '@/business/client/hooks/useActiveWorkspaceId';
 import { useTaskStore } from '@/store/task';
 import { taskDetailSelectors } from '@/store/task/selectors';
 
 import TaskPriorityTag from '../features/TaskPriorityTag';
 import TaskStatusTag from '../features/TaskStatusTag';
 import TaskTriggerTag from '../features/TaskTriggerTag';
+import TaskVisibilityChipLabel from '../features/TaskVisibilityChipLabel';
+import TaskVisibilityTag from '../features/TaskVisibilityTag';
 import TaskScheduleConfig from './TaskScheduleConfig';
 
 interface StatusMeta {
@@ -47,6 +50,8 @@ const TaskProperties = memo(() => {
   const automationMode = useTaskStore(taskDetailSelectors.activeTaskAutomationMode);
   const schedulePattern = useTaskStore(taskDetailSelectors.activeTaskSchedulePattern);
   const scheduleTimezone = useTaskStore(taskDetailSelectors.activeTaskScheduleTimezone);
+  const visibility = useTaskStore(taskDetailSelectors.activeTaskVisibility);
+  const activeWorkspaceId = useActiveWorkspaceId();
 
   if (!taskId) return null;
 
@@ -104,6 +109,12 @@ const TaskProperties = memo(() => {
           />
         </Block>
       </TaskScheduleConfig>
+
+      {activeWorkspaceId && (
+        <TaskVisibilityTag taskIdentifier={taskId} visibility={visibility}>
+          <TaskVisibilityChipLabel variant={'tag'} visibility={visibility} />
+        </TaskVisibilityTag>
+      )}
     </Block>
   );
 });

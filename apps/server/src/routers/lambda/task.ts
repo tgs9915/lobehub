@@ -65,6 +65,10 @@ const createSchema = z.object({
   priority: z.number().min(0).max(4).optional(),
   schedulePattern: z.string().optional(),
   scheduleTimezone: z.string().optional(),
+  // When omitted, the server derives visibility from the parent task or the
+  // assignee agent's visibility (private agent → private task). UI surfaces
+  // such as the top-level "Tasks" create form pass it explicitly.
+  visibility: z.enum(['private', 'public']).optional(),
 });
 
 const updateSchema = z.object({
@@ -102,6 +106,10 @@ const listSchema = z.object({
   parentTaskId: z.string().nullish(),
   priorities: z.array(z.number().min(0).max(4)).max(5).optional(),
   statuses: z.array(z.enum(TASK_STATUSES)).max(10).optional(),
+  // UI-side narrowing of the result set. Omitted means "All" (the chip's
+  // default 'private' is enforced client-side; the server stays permissive
+  // so router tests / external callers don't have to know the chip).
+  visibility: z.enum(['private', 'public']).optional(),
 });
 
 const groupListSchema = z.object({
@@ -118,6 +126,7 @@ const groupListSchema = z.object({
     .min(1)
     .max(10),
   parentTaskId: z.string().nullish(),
+  visibility: z.enum(['private', 'public']).optional(),
 });
 
 // Helper: resolve id/identifier and throw if not found
@@ -1001,6 +1010,14 @@ export const taskRouter = router({
         }
       }
 
+      // Reject changing the assignee to a private agent on a public task —
+      // visibility invariant from LOBE-10961. `undefined` means "no change";
+      // `null` clears the assignee and is always safe.
+      if (data.assigneeAgentId) {
+        const agentVisibility = await ctx.agentModel.getAgentVisibility(data.assigneeAgentId);
+        ctx.taskService.assertAgentVisibilityCompat(resolved.visibility, agentVisibility);
+      }
+
       const resolvedParentTaskId =
         parentTaskId === undefined
           ? undefined
@@ -1020,6 +1037,82 @@ export const taskRouter = router({
       });
     }
   }),
+
+  updateVisibility: taskProcedureWrite
+    .input(idInput.merge(z.object({ visibility: z.enum(['private', 'public']) })))
+    .mutation(async ({ input, ctx }) => {
+      try {
+        const resolved = await resolveOrThrow(ctx.taskModel, input.id);
+
+        // Mirror the edit-lock contract from `update`: reject visibility flips
+        // while another workspace member is actively editing this task. Without
+        // this check a collaborator could silently retitle a private task to
+        // public (or vice versa) while you're mid-edit. LOBE-10962 #1.
+        if (ctx.workspaceId) {
+          const blockedBy = await ctx.editLockService.getBlockingHolder('task', resolved.id);
+          if (blockedBy) {
+            throw new TRPCError({
+              cause: { data: { code: 'DocumentLocked' } },
+              code: 'CONFLICT',
+              message: 'Task is being edited by another user',
+            });
+          }
+        }
+
+        // Owner can always change visibility on their own tasks. In workspace
+        // mode, allow workspace owners to override (mirrors the transferTask
+        // policy at line ~1166): only they can change visibility on tasks
+        // created by other members.
+        if (ctx.workspaceId && resolved.createdByUserId !== ctx.userId) {
+          const [membership] = await ctx.serverDB
+            .select({ role: workspaceMembers.role })
+            .from(workspaceMembers)
+            .where(
+              and(
+                eq(workspaceMembers.workspaceId, ctx.workspaceId),
+                eq(workspaceMembers.userId, ctx.userId),
+                isNull(workspaceMembers.deletedAt),
+              ),
+            )
+            .limit(1);
+          if (!membership || membership.role !== 'owner') {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Only the task creator or workspace owner can change visibility',
+            });
+          }
+        }
+
+        // Promoting a task to public while a private agent is its assignee
+        // breaks the visibility invariant from LOBE-10961. Reject early —
+        // the user should reassign first, then promote.
+        if (input.visibility === 'public' && resolved.assigneeAgentId) {
+          const agentVisibility = await ctx.agentModel.getAgentVisibility(resolved.assigneeAgentId);
+          ctx.taskService.assertAgentVisibilityCompat(input.visibility, agentVisibility);
+        }
+
+        // Promoting a subtask to public while its parent is still private
+        // would orphan the child in the workspace view (LOBE-10962 #3). The
+        // user must promote the parent chain first, or keep the subtask
+        // private.
+        if (input.visibility === 'public' && resolved.parentTaskId) {
+          const parent = await ctx.taskModel.findById(resolved.parentTaskId);
+          ctx.taskService.assertParentVisibilityCompat(input.visibility, parent?.visibility);
+        }
+
+        const updated = await ctx.taskModel.updateVisibility(resolved.id, input.visibility);
+        if (!updated) throw new TRPCError({ code: 'NOT_FOUND', message: 'Task not found' });
+        return { data: updated, message: 'Task visibility updated', success: true };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        console.error('[task:updateVisibility]', error);
+        throw new TRPCError({
+          cause: error,
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update task visibility',
+        });
+      }
+    }),
 
   acquireTaskLock: taskProcedureWrite.input(idInput).mutation(async ({ ctx, input }) => {
     if (!ctx.workspaceId) return { expiresAt: null, holderId: null, lockedByOther: false };

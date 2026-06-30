@@ -126,8 +126,22 @@ export const recentKeys = {
 // ---- task ---------------------------------------------------------------
 export const taskKeys = {
   detail: def('task:detail', (taskId: string) => ['task:detail', taskId]),
-  groupList: def('task:groupList', (agentKey: string | undefined) => ['task:groupList', agentKey]),
-  list: def('task:list', (agentKey: string | undefined) => ['task:list', agentKey]),
+  groupList: def(
+    'task:groupList',
+    (agentKey: string | undefined, visibility: 'all' | 'private' | 'workspace' = 'all') => [
+      'task:groupList',
+      agentKey,
+      visibility,
+    ],
+  ),
+  list: def(
+    'task:list',
+    (agentKey: string | undefined, visibility: 'all' | 'private' | 'workspace' = 'all') => [
+      'task:list',
+      agentKey,
+      visibility,
+    ],
+  ),
 };
 
 // ---- brief --------------------------------------------------------------

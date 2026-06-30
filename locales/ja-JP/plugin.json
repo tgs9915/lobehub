@@ -30,6 +30,7 @@
   "builtins.codex.mcpTool.unknownTool": "MCPツール",
   "builtins.codex.webSearch.query": "クエリ",
   "builtins.linear.render.updatedAt": "{{time}}に更新されました",
+  "builtins.linear.render.updatedAt": "更新日時: {{time}}",
   "builtins.lobe-activator.apiName.activateTools": "ツールをアクティブ化",
   "builtins.lobe-activator.inspector.activateTools.notFoundCount": "{{count}} 件が見つかりません",
   "builtins.lobe-agent-builder.apiName.getAvailableModels": "利用可能なモデルを取得",

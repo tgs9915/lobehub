@@ -123,6 +123,12 @@ export const CreateAgentSchema = z.object({
   title: z.string().nullish(),
   tts: z.custom<LobeAgentTTSConfig>().optional(),
   virtual: z.boolean().nullish(),
+  /**
+   * `private` keeps the agent visible only to its creator within the workspace;
+   * `public` (default) makes it visible to every workspace member. Ignored in
+   * personal mode (no workspaceId).
+   */
+  visibility: z.enum(['private', 'public']).optional(),
 });
 
 export type CreateAgentConfig = z.infer<typeof CreateAgentSchema>;

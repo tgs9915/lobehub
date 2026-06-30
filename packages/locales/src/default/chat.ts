@@ -448,6 +448,10 @@ export default {
   'newCodexAgent': 'Add Codex',
   'newPlatformAgent': 'Connect Agent',
   'newGroupChat': 'Create Group',
+  'agent.publishToWorkspace': 'Publish to Workspace',
+  'agent.publishToWorkspaceConfirm':
+    'Other workspace members will be able to use this agent. You will not be able to make it private again.',
+  'agent.publishToWorkspaceSuccess': 'Published to workspace',
 
   // Op status tray (floating panel above the chat input during a run)
   'opStatusTray.status.compressing': 'Compressing context',
@@ -633,6 +637,10 @@ export default {
   'sessionGroup.noAvailableAgents': 'No available agents',
   'sessionGroup.noMatchingAgents': 'No matching agents found',
   'sessionGroup.noSelectedAgents': 'Please select agents',
+  'sessionGroup.publishToWorkspace': 'Publish to Workspace',
+  'sessionGroup.publishToWorkspaceConfirm':
+    'Other workspace members will be able to use this folder. You will not be able to make it private again.',
+  'sessionGroup.publishToWorkspaceSuccess': 'Published to workspace',
   'sessionGroup.rename': 'Rename Category',
   'sessionGroup.renameSuccess': 'Renamed successfully',
   'sessionGroup.searchAgents': 'Search agents',
@@ -920,8 +928,19 @@ export default {
   'createTask.instructionPlaceholder': 'Add task instruction...',
   'createTask.submit': 'Create task',
   'createTask.titlePlaceholder': 'Task title',
+  'createTask.visibility.changeFailed': 'Failed to change task visibility',
+  'createTask.visibility.helperPrivate': 'Only you can see this task.',
+  'createTask.visibility.helperWorkspace': 'Everyone in this workspace can see this task.',
+  'createTask.visibility.label': 'Visibility',
+  'createTask.visibility.privateAgentDisabled':
+    'Private agents can only run private tasks. Pick a workspace agent or switch this task to Private.',
+  'createTask.visibility.privateAgentLocked': 'Private agents can only run private tasks.',
+  'createTask.visibility.private': 'Private',
+  'createTask.visibility.workspace': 'Workspace',
   'taskList.activeTasks': 'Active Tasks',
   'taskList.all': 'All tasks',
+  'taskList.visibility.all': 'All',
+  'taskList.visibility.label': 'Visibility',
   'taskList.breadcrumb.task': 'Task',
   'taskList.empty': 'No tasks yet',
   'taskList.emptyHero.greeting': 'What should we tackle today?',

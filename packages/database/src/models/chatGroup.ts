@@ -23,7 +23,14 @@ export class ChatGroupModel {
   }
 
   private ownership = () =>
-    buildWorkspaceWhere({ userId: this.userId, workspaceId: this.workspaceId }, chatGroups);
+    buildWorkspaceWhere(
+      { userId: this.userId, workspaceId: this.workspaceId },
+      {
+        userId: chatGroups.userId,
+        workspaceId: chatGroups.workspaceId,
+        visibility: chatGroups.visibility,
+      },
+    );
 
   /**
    * Get member avatar metas (avatar + backgroundColor) grouped by chatGroupId,
@@ -182,6 +189,32 @@ export class ChatGroupModel {
 
     if (!result) {
       throw new Error('Chat group not found or access denied');
+    }
+
+    return result;
+  }
+
+  /**
+   * Publish a private chat group into the workspace. One-way: once shared,
+   * other members may have started using it, so we never let it slip back to
+   * `private`. Restricted to the creator's own still-private group.
+   */
+  async publishToWorkspace(id: string): Promise<ChatGroupItem> {
+    const [result] = await this.db
+      .update(chatGroups)
+      .set({ updatedAt: new Date(), visibility: 'public' })
+      .where(
+        and(
+          eq(chatGroups.id, id),
+          this.ownership(),
+          eq(chatGroups.userId, this.userId),
+          eq(chatGroups.visibility, 'private'),
+        ),
+      )
+      .returning();
+
+    if (!result) {
+      throw new Error('Chat group not found, already published, or access denied');
     }
 
     return result;

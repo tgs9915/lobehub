@@ -159,6 +159,7 @@ export class TaskDetailSliceActionImpl {
     priority?: number;
     schedulePattern?: string;
     scheduleTimezone?: string;
+    visibility?: 'private' | 'public';
   }): Promise<CreatedTask | null> => {
     this.#set({ isCreatingTask: true }, false, 'createTask/start');
     try {
@@ -247,6 +248,21 @@ export class TaskDetailSliceActionImpl {
     const activeTaskId = this.#get().activeTaskId;
     if (activeTaskId && activeTaskId !== taskId) {
       await this.internal_refreshTaskDetail(activeTaskId);
+    }
+  };
+
+  updateTaskVisibility = async (id: string, visibility: 'private' | 'public'): Promise<void> => {
+    try {
+      await taskService.updateVisibility(id, visibility);
+      await Promise.all([this.#get().refreshTaskList(), this.internal_refreshTaskDetail(id)]);
+    } catch (error) {
+      message.error(
+        t('createTask.visibility.changeFailed', {
+          defaultValue: 'Failed to change task visibility',
+          ns: 'chat',
+        }),
+      );
+      throw error;
     }
   };
 
