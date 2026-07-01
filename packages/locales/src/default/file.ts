@@ -191,7 +191,12 @@ export default {
   'pageList.noResults': 'No matching pages found',
   'pageList.pageCount': '{{count}} pages in total',
   'pageList.pageSizeItem': '{{count}} items',
+  'pageList.privateEmpty':
+    'Start drafting here — only you can see these pages until you publish them to the workspace.',
+  'pageList.privateTitle': 'Private',
   'pageList.title': 'Pages',
+  'pageList.workspaceEmpty': 'No shared pages yet.',
+  'pageList.workspaceTitle': 'Workspace',
   'pageList.transferConfirm': 'Transfer',
   'pageList.transferDescription':
     'Move this page (and any folders it contains) to another workspace.',

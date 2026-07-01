@@ -1,6 +1,6 @@
-import { Avatar, Icon } from '@lobehub/ui';
-import { FileTextIcon } from 'lucide-react';
-import { type MouseEvent } from 'react';
+import { Avatar, Flexbox, Icon } from '@lobehub/ui';
+import { FileTextIcon, LockIcon } from 'lucide-react';
+import { type MouseEvent, type ReactNode } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -35,6 +35,7 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
   const active = selectedPageId === pageId;
   const title = document?.title || t('pageList.untitled');
   const emoji = document?.metadata?.emoji;
+  const isPrivate = document?.visibility === 'private';
 
   const toggleEditing = useCallback(
     (visible?: boolean) => {
@@ -83,6 +84,19 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
 
   const dropdownMenu = useDropdownMenu({ pageId, toggleEditing });
 
+  // Subtle lock indicator next to the title marks pages that only the creator
+  // can see — the accordion header already communicates the bucket, but the
+  // per-item marker keeps the visibility obvious when items are copied/shared
+  // out of context.
+  const decoratedTitle: ReactNode = isPrivate ? (
+    <Flexbox horizontal align="center" gap={4}>
+      <span>{title}</span>
+      <Icon icon={LockIcon} size={{ size: 12, strokeWidth: 1.8 }} />
+    </Flexbox>
+  ) : (
+    title
+  );
+
   return (
     <>
       <NavItem
@@ -94,7 +108,7 @@ const PageListItem = memo<DocumentItemProps>(({ pageId, className }) => {
         href={`/page/${pageId}`}
         icon={icon}
         key={pageId}
-        title={title}
+        title={decoratedTitle}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
       />
