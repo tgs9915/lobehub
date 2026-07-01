@@ -56,7 +56,7 @@
     "zod": "^3.25.76"
   },
   "peerDependencies": {
-    "@lobehub/ui": "^5",
+    "@lobehub/ui": "^5.18.0",
     "antd-style": "*",
     "lucide-react": "*",
     "react": "*",
