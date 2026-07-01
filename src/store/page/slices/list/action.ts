@@ -139,6 +139,18 @@ export class ListActionImpl {
     await this.#get().fetchDocuments();
   };
 
+  /**
+   * Publish a private page (and its whole subtree) to the workspace, then
+   * refetch the sidebar so the item hops from the "Private" accordion into
+   * "Workspace" immediately. Errors bubble up so the caller can surface a
+   * localized toast without swallowing the reason.
+   */
+  publishPageToWorkspace = async (pageId: string): Promise<{ documentIds: string[] }> => {
+    const result = await documentService.publishDocumentToWorkspace(pageId);
+    await this.#get().refreshDocuments();
+    return result;
+  };
+
   setSearchKeywords = (keywords: string): void => {
     this.#set({ searchKeywords: keywords }, false, n('setSearchKeywords'));
   };

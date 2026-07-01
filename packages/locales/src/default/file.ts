@@ -194,6 +194,15 @@ export default {
   'pageList.privateEmpty':
     'Start drafting here — only you can see these pages until you publish them to the workspace.',
   'pageList.privateTitle': 'Private',
+  'pageList.publishConfirm.content_one':
+    'This page will be shared with everyone in the workspace. Publishing is one-way — it can’t be moved back to private.',
+  'pageList.publishConfirm.content_other':
+    'This page and its {{count}} nested pages will be shared with everyone in the workspace. Publishing is one-way — they can’t be moved back to private.',
+  'pageList.publishConfirm.ok': 'Publish',
+  'pageList.publishConfirm.title': 'Publish to workspace',
+  'pageList.publishError': 'Failed to publish page',
+  'pageList.publishSuccess': 'Page published to workspace',
+  'pageList.publishToWorkspace': 'Publish to workspace',
   'pageList.title': 'Pages',
   'pageList.workspaceEmpty': 'No shared pages yet.',
   'pageList.workspaceTitle': 'Workspace',

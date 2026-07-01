@@ -2,10 +2,11 @@ import { type MenuProps } from '@lobehub/ui';
 import { Icon } from '@lobehub/ui';
 import { confirmModal } from '@lobehub/ui/base-ui';
 import { App } from 'antd';
-import { CopyPlus, PanelTop, Pencil, Trash2 } from 'lucide-react';
+import { CopyPlus, PanelTop, Pencil, Trash2, UsersIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useActiveWorkspaceId } from '@/business/client/hooks/useActiveWorkspaceId';
 import { useActiveWorkspaceSlug } from '@/business/client/hooks/useActiveWorkspaceSlug';
 import { useDocumentTransferMenuItem } from '@/business/client/hooks/useDocumentTransferMenuItem';
 import { isDesktop } from '@/const/version';
@@ -13,12 +14,39 @@ import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwar
 import { buildWorkspaceAwarePath } from '@/features/Workspace/workspaceAwarePath';
 import { usePermission } from '@/hooks/usePermission';
 import { useElectronStore } from '@/store/electron';
-import { usePageStore } from '@/store/page';
+import { pageSelectors, usePageStore } from '@/store/page';
 
 interface ActionProps {
   pageId: string;
   toggleEditing: (visible?: boolean) => void;
 }
+
+/**
+ * Count the number of descendants (including the root) of the given page in
+ * the current sidebar snapshot. Used only for messaging in the publish confirm
+ * modal — the server does the authoritative subtree walk.
+ */
+const countSubtreeSize = (
+  allDocs: ReturnType<typeof pageSelectors.getFilteredDocuments>,
+  rootId: string,
+): number => {
+  let count = 0;
+  let frontier = [rootId];
+  const seen = new Set<string>();
+  while (frontier.length > 0) {
+    const next: string[] = [];
+    for (const id of frontier) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      count += 1;
+      for (const doc of allDocs) {
+        if (doc.parentId === id) next.push(doc.id);
+      }
+    }
+    frontier = next;
+  }
+  return count;
+};
 
 export const useDropdownMenu = ({
   pageId,
@@ -28,12 +56,20 @@ export const useDropdownMenu = ({
   const { message } = App.useApp();
   const navigate = useWorkspaceAwareNavigate();
   const activeWorkspaceSlug = useActiveWorkspaceSlug();
+  const activeWorkspaceId = useActiveWorkspaceId();
   const { allowed: canCreatePage } = usePermission('create_content');
   const { allowed: canEditPage } = usePermission('edit_own_content');
   const addTab = useElectronStore((s) => s.addTab);
   const removePage = usePageStore((s) => s.removePage);
   const duplicatePage = usePageStore((s) => s.duplicatePage);
+  const publishPageToWorkspace = usePageStore((s) => s.publishPageToWorkspace);
+  const document = usePageStore((s) => pageSelectors.getDocumentById(pageId)(s));
   const transferMenuItems = useDocumentTransferMenuItem(pageId);
+
+  const isPrivate = document?.visibility === 'private';
+  // Publish is workspace-mode + owner-only (backend also enforces via SQL
+  // guard). Personal-mode has no visibility concept, so we hide the entry.
+  const canPublish = Boolean(activeWorkspaceId && isPrivate && canEditPage);
 
   const handleDelete = () => {
     if (!canEditPage) return;
@@ -64,6 +100,31 @@ export const useDropdownMenu = ({
     } catch (error) {
       console.error('Failed to duplicate page:', error);
     }
+  };
+
+  const handlePublish = () => {
+    if (!canPublish) return;
+    const allDocs = pageSelectors.getFilteredDocuments(usePageStore.getState());
+    const subtreeSize = countSubtreeSize(allDocs, pageId);
+
+    confirmModal({
+      cancelText: t('cancel'),
+      content: t('pageList.publishConfirm.content', {
+        count: subtreeSize,
+        ns: 'file',
+      }),
+      okText: t('pageList.publishConfirm.ok', { ns: 'file' }),
+      onOk: async () => {
+        try {
+          await publishPageToWorkspace(pageId);
+          message.success(t('pageList.publishSuccess', { ns: 'file' }));
+        } catch (error) {
+          console.error('Failed to publish page:', error);
+          message.error(t('pageList.publishError', { ns: 'file' }));
+        }
+      },
+      title: t('pageList.publishConfirm.title', { ns: 'file' }),
+    });
   };
 
   return useCallback(
@@ -101,6 +162,17 @@ export const useDropdownMenu = ({
           label: t('pageList.duplicate', { ns: 'file' }),
           onClick: handleDuplicate,
         },
+        ...(canPublish
+          ? [
+              { type: 'divider' as const },
+              {
+                icon: <Icon icon={UsersIcon} />,
+                key: 'publishToWorkspace',
+                label: t('pageList.publishToWorkspace', { ns: 'file' }),
+                onClick: handlePublish,
+              },
+            ]
+          : []),
         ...(transferMenuItems ?? []),
         { type: 'divider' },
         {
@@ -117,8 +189,10 @@ export const useDropdownMenu = ({
       toggleEditing,
       handleDuplicate,
       handleDelete,
+      handlePublish,
       canCreatePage,
       canEditPage,
+      canPublish,
       activeWorkspaceSlug,
       pageId,
       addTab,

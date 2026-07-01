@@ -264,6 +264,14 @@ export class DocumentService {
   ): Promise<{ rootId: string }> {
     return lambdaClient.document.copyDocumentToWorkspace.mutate({ documentId, targetWorkspaceId });
   }
+
+  /**
+   * Publish a private document (and its whole subtree) into the workspace.
+   * One-way: once published there is no client-side path back to `private`.
+   */
+  async publishDocumentToWorkspace(id: string): Promise<{ documentIds: string[] }> {
+    return lambdaClient.document.publishDocumentToWorkspace.mutate({ id });
+  }
 }
 
 export const documentService = new DocumentService() as DocumentService &
