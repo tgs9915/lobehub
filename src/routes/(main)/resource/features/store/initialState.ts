@@ -4,6 +4,13 @@ import { FilesTabs, SortType } from '@/types/files';
 export type ViewMode = 'list' | 'masonry';
 export type SelectAllState = 'all' | 'loaded' | 'none';
 
+/**
+ * Resources sidebar visibility filter — narrows the (already
+ * ownership-filtered) list to private / workspace-shared / all. Only
+ * meaningful in workspace mode; personal mode ignores the value.
+ */
+export type ResourceListVisibilityFilter = 'all' | 'private' | 'workspace';
+
 export interface State {
   /**
    * Current file category filter
@@ -17,6 +24,12 @@ export interface State {
    * Current library ID
    */
   libraryId?: string;
+  /**
+   * Workspace mode visibility filter for the top-level resource list.
+   * Only surfaces the filter chip in Explorer's header when a workspace is
+   * active and the user has not drilled into a library or folder.
+   */
+  listVisibility: ResourceListVisibilityFilter;
   /**
    * View mode for displaying resources
    */
@@ -56,6 +69,7 @@ export const initialState: State = {
   category: FilesTabs.All,
   currentViewItemId: undefined,
   libraryId: undefined,
+  listVisibility: 'all',
   mode: 'explorer',
   pendingRenameItemId: null,
   searchQuery: null,

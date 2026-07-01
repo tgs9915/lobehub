@@ -100,6 +100,12 @@ export interface CreateDocumentParams {
   parentId?: string;
   slug?: string;
   title: string;
+  /**
+   * Workspace-only: force the new document into a specific visibility bucket.
+   * Omit to let the server pick the default (`api` sourceType top-level docs
+   * default to `private`, nested docs inherit their parent).
+   */
+  visibility?: 'private' | 'public';
 }
 
 export interface ListDocumentHistoryParams extends ListHistoryInput {}

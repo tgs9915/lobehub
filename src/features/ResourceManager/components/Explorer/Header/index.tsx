@@ -20,6 +20,7 @@ import AddButton from '../../Header/AddButton';
 import BatchActionsDropdown from '../ToolBar/BatchActionsDropdown';
 import SortDropdown from '../ToolBar/SortDropdown';
 import ViewSwitcher from '../ToolBar/ViewSwitcher';
+import VisibilityFilter from '../ToolBar/VisibilityFilter';
 import Breadcrumb from './Breadcrumb';
 import SearchInput from './SearchInput';
 
@@ -145,6 +146,7 @@ const Header = memo(() => {
       left={leftContent}
       right={
         <>
+          <VisibilityFilter />
           <SearchInput />
           <SortDropdown />
           <BatchActionsDropdown selectCount={selectCount} onActionClick={onActionClick} />

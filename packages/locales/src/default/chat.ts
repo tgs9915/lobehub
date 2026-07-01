@@ -460,6 +460,10 @@ export default {
   'resources.publishToWorkspace.success': 'Published to workspace',
   'resources.publishToWorkspace.error': 'Failed to publish file to workspace',
   'resources.visibility.privateTooltip': 'Only you can see this file',
+  'resources.visibility.label': 'Visibility',
+  'resources.visibility.all': 'All',
+  'resources.visibility.private': 'Private',
+  'resources.visibility.workspace': 'Workspace',
 
   // Op status tray (floating panel above the chat input during a run)
   'opStatusTray.status.compressing': 'Compressing context',

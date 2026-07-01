@@ -31,9 +31,16 @@ const ResourceExplorer = memo(() => {
   useResourceManagerUrlSync();
 
   // Get state from Resource Manager store
-  const [libraryId, category, viewMode, searchQuery, sorter, sortType] = useResourceManagerStore(
-    (s) => [s.libraryId, s.category, s.viewMode, s.searchQuery, s.sorter, s.sortType],
-  );
+  const [libraryId, category, viewMode, searchQuery, sorter, sortType, listVisibility] =
+    useResourceManagerStore((s) => [
+      s.libraryId,
+      s.category,
+      s.viewMode,
+      s.searchQuery,
+      s.sorter,
+      s.sortType,
+      s.listVisibility,
+    ]);
 
   // Get folder path for empty state check
   const { currentFolderSlug } = useFolderPath();
@@ -49,8 +56,14 @@ const ResourceExplorer = memo(() => {
       showFilesInKnowledgeBase: false,
       sortType,
       sorter,
+      visibility:
+        listVisibility === 'private'
+          ? ('private' as const)
+          : listVisibility === 'workspace'
+            ? ('public' as const)
+            : undefined,
     }),
-    [category, libraryId, currentFolderSlug, sortType, sorter],
+    [category, libraryId, currentFolderSlug, sortType, sorter, listVisibility],
   );
 
   // Use SWR for data fetching with automatic caching and revalidation

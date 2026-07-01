@@ -269,8 +269,11 @@ export class DocumentModel {
           ),
         );
 
-      // TODO(LOBE-11040): cascade document_chunks.visibility once the mirror
-      // column ships, so RAG retrieval sees the new visibility without a join.
+      // No child-table cascade needed here — Pages (`sourceType: 'api'`) hold
+      // content inline in `documents.content` / `documents.pages`, and the
+      // `document_chunks` junction has no read consumers on the RAG hot path
+      // (that lane goes through `chunks` + `fileChunks` + `files`). See
+      // LOBE-11040 for the deferred RAG-lane analysis.
 
       return { documentIds: ids };
     });

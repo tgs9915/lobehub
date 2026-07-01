@@ -1,15 +1,16 @@
 'use client';
 
-import { Accordion, AccordionItem, ContextMenuTrigger, Flexbox, Icon, Text } from '@lobehub/ui';
-import { LockIcon, UsersIcon } from 'lucide-react';
+import { Accordion, AccordionItem, ContextMenuTrigger, Flexbox, Text } from '@lobehub/ui';
 import React, { memo, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useActiveWorkspaceId } from '@/business/client/hooks/useActiveWorkspaceId';
+import NeuralNetworkLoading from '@/components/NeuralNetworkLoading';
 import SkeletonList from '@/features/NavPanel/components/SkeletonList';
 import PageEmpty from '@/features/PageEmpty';
 import { pageSelectors, usePageStore } from '@/store/page';
 
+import AddButton from '../Header/AddButton';
 import Actions from './Actions';
 import AllPagesDrawer from './AllPagesDrawer';
 import List from './List';
@@ -32,9 +33,11 @@ export enum GroupKey {
 const Body = memo(() => {
   const { t } = useTranslation('file');
 
-  // Initialize documents list via SWR
+  // Initialize documents list via SWR; keep `isValidating` so the accordion
+  // header can show a subtle in-flight indicator (mirrors the Private Agent
+  // pattern in `home/_layout/Body/Private`).
   const useFetchDocuments = usePageStore((s) => s.useFetchDocuments);
-  useFetchDocuments();
+  const { isValidating } = useFetchDocuments();
 
   const isLoading = usePageStore(pageSelectors.isDocumentsLoading);
 
@@ -56,20 +59,25 @@ const Body = memo(() => {
       {activeWorkspaceId ? (
         <Accordion defaultExpandedKeys={[GroupKey.PrivatePages, GroupKey.WorkspacePages]} gap={2}>
           <AccordionItem
-            action={<Actions />}
             itemKey={GroupKey.PrivatePages}
             paddingBlock={4}
             paddingInline={'8px 4px'}
+            action={
+              <Flexbox horizontal align="center" gap={2}>
+                <Actions />
+                <AddButton visibility="private" />
+              </Flexbox>
+            }
             headerWrapper={(header) => (
               <ContextMenuTrigger items={dropdownMenu}>{header}</ContextMenuTrigger>
             )}
             title={
               <Flexbox horizontal align="center" gap={4}>
-                <Icon icon={LockIcon} size={12} />
                 <Text ellipsis fontSize={12} type={'secondary'} weight={500}>
                   {t('pageList.privateTitle')}
                   {privateCount > 0 && ` ${privateCount}`}
                 </Text>
+                {isValidating && <NeuralNetworkLoading size={14} />}
               </Flexbox>
             }
           >
@@ -79,10 +87,14 @@ const Body = memo(() => {
               ) : (
                 <Flexbox gap={1} paddingBlock={1}>
                   {privateCount === 0 ? (
-                    <PageEmpty
-                      description={searchActive ? undefined : t('pageList.privateEmpty')}
-                      search={searchActive}
-                    />
+                    <Text
+                      align="center"
+                      fontSize={12}
+                      style={{ paddingBlock: 12, paddingInline: 8 }}
+                      type={'secondary'}
+                    >
+                      {searchActive ? t('pageList.noResults') : t('pageList.privateEmpty')}
+                    </Text>
                   ) : (
                     <List visibility="private" />
                   )}
@@ -91,6 +103,7 @@ const Body = memo(() => {
             </Suspense>
           </AccordionItem>
           <AccordionItem
+            action={<AddButton visibility="public" />}
             itemKey={GroupKey.WorkspacePages}
             paddingBlock={4}
             paddingInline={'8px 4px'}
@@ -99,11 +112,11 @@ const Body = memo(() => {
             )}
             title={
               <Flexbox horizontal align="center" gap={4}>
-                <Icon icon={UsersIcon} size={12} />
                 <Text ellipsis fontSize={12} type={'secondary'} weight={500}>
                   {t('pageList.workspaceTitle')}
                   {workspaceCount > 0 && ` ${workspaceCount}`}
                 </Text>
+                {isValidating && <NeuralNetworkLoading size={14} />}
               </Flexbox>
             }
           >
@@ -113,10 +126,14 @@ const Body = memo(() => {
               ) : (
                 <Flexbox gap={1} paddingBlock={1}>
                   {workspaceCount === 0 ? (
-                    <PageEmpty
-                      description={searchActive ? undefined : t('pageList.workspaceEmpty')}
-                      search={searchActive}
-                    />
+                    <Text
+                      align="center"
+                      fontSize={12}
+                      style={{ paddingBlock: 12, paddingInline: 8 }}
+                      type={'secondary'}
+                    >
+                      {searchActive ? t('pageList.noResults') : t('pageList.workspaceEmpty')}
+                    </Text>
                   ) : (
                     <List visibility="workspace" />
                   )}
@@ -136,10 +153,13 @@ const Body = memo(() => {
               <ContextMenuTrigger items={dropdownMenu}>{header}</ContextMenuTrigger>
             )}
             title={
-              <Text ellipsis fontSize={12} type={'secondary'} weight={500}>
-                {t('pageList.title')}
-                {filteredDocumentsCount > 0 && ` ${filteredDocumentsCount}`}
-              </Text>
+              <Flexbox horizontal align="center" gap={4}>
+                <Text ellipsis fontSize={12} type={'secondary'} weight={500}>
+                  {t('pageList.title')}
+                  {filteredDocumentsCount > 0 && ` ${filteredDocumentsCount}`}
+                </Text>
+                {isValidating && <NeuralNetworkLoading size={14} />}
+              </Flexbox>
             }
           >
             <Suspense fallback={<SkeletonList />}>

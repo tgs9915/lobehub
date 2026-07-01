@@ -8,7 +8,18 @@ import { useTranslation } from 'react-i18next';
 import { usePermission } from '@/hooks/usePermission';
 import { usePageStore } from '@/store/page';
 
-const AddButton = memo(() => {
+interface AddButtonProps {
+  /**
+   * Force the new page's visibility. Used by the workspace-mode sidebar so
+   * each accordion header creates directly into its own bucket.
+   *
+   * Omit for the personal-mode / header-level entry — the server picks the
+   * default (`private` for top-level `api` docs).
+   */
+  visibility?: 'private' | 'public';
+}
+
+const AddButton = memo<AddButtonProps>(({ visibility }) => {
   const { t } = useTranslation('file');
   const { allowed: canCreate } = usePermission('create_content');
 
@@ -18,7 +29,7 @@ const AddButton = memo(() => {
     if (!canCreate) return;
 
     const untitledTitle = t('pageList.untitled');
-    createNewPage(untitledTitle);
+    createNewPage(untitledTitle, visibility);
   };
 
   return (

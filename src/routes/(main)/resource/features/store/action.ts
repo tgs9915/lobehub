@@ -5,7 +5,7 @@ import type { StoreSetter } from '@/store/types';
 import { flattenActions } from '@/store/utils/flattenActions';
 import type { FilesTabs, SortType } from '@/types/files';
 
-import type { SelectAllState, State, ViewMode } from './initialState';
+import type { ResourceListVisibilityFilter, SelectAllState, State, ViewMode } from './initialState';
 import { initialState } from './initialState';
 
 export type MultiSelectActionType =
@@ -147,6 +147,12 @@ export class ResourceManagerStoreActionImpl {
 
   setLibraryId = (libraryId?: string): void => {
     this.#set({ libraryId });
+  };
+
+  setListVisibility = (listVisibility: ResourceListVisibilityFilter): void => {
+    // Reset selection when the visible pool changes so a leftover "select all"
+    // does not accidentally target rows that are no longer on screen.
+    this.#set({ listVisibility, selectAllState: 'none', selectedFileIds: [] });
   };
 
   setMode = (mode: ResourceManagerMode): void => {

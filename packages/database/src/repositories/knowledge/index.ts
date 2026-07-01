@@ -90,6 +90,7 @@ export class KnowledgeRepo {
     parentId,
     limit = 50,
     offset = 0,
+    visibility,
   }: QueryFileListParams = {}): Promise<KnowledgeItem[]> {
     // If parentId is provided, check if it's a slug and resolve it to an ID
     let resolvedParentId = parentId;
@@ -102,6 +103,11 @@ export class KnowledgeRepo {
       // Otherwise assume it's already an ID
     }
 
+    // Visibility filter is only meaningful in workspace mode. Personal-mode
+    // rows have `visibility` set to the schema default and are already fully
+    // scoped by `workspace_id IS NULL AND user_id = caller`.
+    const effectiveVisibility = this.workspaceId ? visibility : undefined;
+
     // Build file query
     const fileQuery = this.buildFileQuery({
       category,
@@ -111,6 +117,7 @@ export class KnowledgeRepo {
       showFilesInKnowledgeBase,
       sortType,
       sorter,
+      visibility: effectiveVisibility,
     });
 
     // Build document query (notes)
@@ -121,6 +128,7 @@ export class KnowledgeRepo {
       q,
       sortType,
       sorter,
+      visibility: effectiveVisibility,
     });
 
     // Combine both queries with UNION ALL
@@ -388,6 +396,7 @@ export class KnowledgeRepo {
     knowledgeBaseId,
     showFilesInKnowledgeBase,
     parentId,
+    visibility,
   }: QueryFileListParams = {}): ReturnType<typeof sql> {
     const whereConditions: any[] = [this.fileOwnershipSql('f')];
 
@@ -403,6 +412,15 @@ export class KnowledgeRepo {
     // Search filter
     if (q) {
       whereConditions.push(sql`f.name ILIKE ${`%${q}%`}`);
+    }
+
+    // Visibility filter — narrows the ownership-scoped pool. Explicit private
+    // rows with no `visibility` column still surface under 'public' since the
+    // schema default + backfill treats them as public.
+    if (visibility === 'private') {
+      whereConditions.push(sql`f.visibility = 'private'`);
+    } else if (visibility === 'public') {
+      whereConditions.push(sql`(f.visibility = 'public' OR f.visibility IS NULL)`);
     }
 
     // Category filter
@@ -447,6 +465,12 @@ export class KnowledgeRepo {
         } else {
           kbWhereConditions.push(sql`f.file_type ILIKE ${`${fileTypePrefix}%`}`);
         }
+      }
+
+      if (visibility === 'private') {
+        kbWhereConditions.push(sql`f.visibility = 'private'`);
+      } else if (visibility === 'public') {
+        kbWhereConditions.push(sql`(f.visibility = 'public' OR f.visibility IS NULL)`);
       }
 
       return sql`
@@ -523,6 +547,7 @@ export class KnowledgeRepo {
     q,
     knowledgeBaseId,
     parentId,
+    visibility,
   }: QueryFileListParams = {}): ReturnType<typeof sql> {
     const whereConditions: any[] = [
       this.documentOwnershipSql('documents'),
@@ -542,6 +567,14 @@ export class KnowledgeRepo {
     if (q) {
       whereConditions.push(
         sql`(${documents.title} ILIKE ${`%${q}%`} OR ${documents.filename} ILIKE ${`%${q}%`})`,
+      );
+    }
+
+    if (visibility === 'private') {
+      whereConditions.push(sql`${documents.visibility} = 'private'`);
+    } else if (visibility === 'public') {
+      whereConditions.push(
+        sql`(${documents.visibility} = 'public' OR ${documents.visibility} IS NULL)`,
       );
     }
 
@@ -608,6 +641,12 @@ export class KnowledgeRepo {
         kbWhereConditions.push(sql`(d.title ILIKE ${`%${q}%`} OR d.filename ILIKE ${`%${q}%`})`);
       }
 
+      if (visibility === 'private') {
+        kbWhereConditions.push(sql`d.visibility = 'private'`);
+      } else if (visibility === 'public') {
+        kbWhereConditions.push(sql`(d.visibility = 'public' OR d.visibility IS NULL)`);
+      }
+
       // Category filter
       if (category && category !== FilesTabs.All) {
         const fileTypePrefix = this.getFileTypePrefix(category as FilesTabs);
@@ -627,7 +666,9 @@ export class KnowledgeRepo {
         } else if (fileTypePrefix) {
           kbWhereConditions.push(sql`d.file_type ILIKE ${`${fileTypePrefix}%`}`);
         } else {
-          // Exclude documents from other categories (Images, Videos, Audios, Websites)
+          // Exclude documents from other categories (Images, Videos, Audios, Websites).
+          // Keep the NULL placeholder column set aligned with the other UNION
+          // branches so PostgreSQL doesn't complain about mismatched arity.
           return sql`
             SELECT
               NULL::varchar(30) as id,
@@ -645,6 +686,8 @@ export class KnowledgeRepo {
               NULL::text as content,
               NULL::varchar(255) as slug,
               NULL::jsonb as metadata,
+              NULL::text as user_id,
+              NULL::text as visibility,
               NULL::text as source_type
             WHERE false
           `;
