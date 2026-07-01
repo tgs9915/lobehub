@@ -411,6 +411,11 @@ export class FileManageActionImpl {
     await revalidateResources();
   };
 
+  publishFileToWorkspace = async (id: string): Promise<void> => {
+    await fileService.publishFileToWorkspace(id);
+    await this.#get().refreshFileList();
+  };
+
   removeAllFiles = async (): Promise<void> => {
     await fileService.removeAllFiles();
   };

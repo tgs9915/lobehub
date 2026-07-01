@@ -445,6 +445,25 @@ export class FileModel {
       .where(and(eq(files.id, id), this.ownership()));
 
   /**
+   * Publish a private file into the workspace. **One-way only** — mirrors
+   * `AgentModel.publishToWorkspace`. The combined `user_id = ?` +
+   * `visibility = 'private'` guards lock the operation to the creator's own
+   * still-private file; an already-public row is a no-op.
+   */
+  publishToWorkspace = async (fileId: string) =>
+    this.db
+      .update(files)
+      .set({ updatedAt: new Date(), visibility: 'public' })
+      .where(
+        and(
+          eq(files.id, fileId),
+          this.ownership(),
+          eq(files.userId, this.userId),
+          eq(files.visibility, 'private'),
+        ),
+      );
+
+  /**
    * get the corresponding file type prefix according to FilesTabs
    */
   private getFileTypePrefix = (category: FilesTabs): string | string[] => {

@@ -30,6 +30,14 @@ export interface KnowledgeItem {
   sourceType: 'file' | 'document';
   updatedAt: Date;
   url?: string;
+  /** Workspace creator id (used by UI to decide if current user owns the row). */
+  userId?: string | null;
+  /**
+   * Workspace visibility. `null` when querying in personal mode (column is
+   * ignored). UI uses this together with `userId` to surface the lock icon
+   * and the publish-to-workspace affordance.
+   */
+  visibility?: 'private' | 'public' | null;
 }
 
 /**
@@ -50,10 +58,19 @@ export class KnowledgeRepo {
     this.documentModel = new DocumentModel(db, userId, workspaceId);
   }
 
-  private fileOwnershipSql = (alias: 'f' = 'f') =>
-    this.workspaceId
-      ? sql`${sql.raw(`${alias}.workspace_id`)} = ${this.workspaceId}`
-      : sql`${sql.raw(`${alias}.user_id`)} = ${this.userId} AND ${sql.raw(`${alias}.workspace_id`)} IS NULL`;
+  private fileOwnershipSql = (alias: 'f' = 'f') => {
+    if (!this.workspaceId) {
+      return sql`${sql.raw(`${alias}.user_id`)} = ${this.userId} AND ${sql.raw(`${alias}.workspace_id`)} IS NULL`;
+    }
+
+    // Workspace mode: members see all public rows; private rows are scoped to
+    // their creator. Mirrors `buildWorkspaceWhere` for the raw-SQL UNION paths.
+    return sql`${sql.raw(`${alias}.workspace_id`)} = ${this.workspaceId} AND (
+      ${sql.raw(`${alias}.visibility`)} IS NULL
+      OR ${sql.raw(`${alias}.visibility`)} = 'public'
+      OR (${sql.raw(`${alias}.visibility`)} = 'private' AND ${sql.raw(`${alias}.user_id`)} = ${this.userId})
+    )`;
+  };
 
   private documentOwnershipSql = (alias: 'd' | 'documents' = 'd') =>
     this.workspaceId
@@ -164,6 +181,8 @@ export class KnowledgeRepo {
         sourceType: row.source_type,
         updatedAt: new Date(row.updated_at),
         url: row.url,
+        userId: row.user_id,
+        visibility: row.visibility,
       };
     });
 
@@ -192,6 +211,8 @@ export class KnowledgeRepo {
         d.content,
         d.slug,
         COALESCE(d.metadata, f.metadata) as metadata,
+        f.user_id,
+        f.visibility,
         'file' as source_type
       FROM ${files} f
       LEFT JOIN ${documents} d
@@ -220,6 +241,8 @@ export class KnowledgeRepo {
         content,
         slug,
         metadata,
+        user_id,
+        visibility,
         'document' as source_type
       FROM ${documents}
       WHERE ${this.documentOwnershipSql('documents')}
@@ -277,6 +300,8 @@ export class KnowledgeRepo {
         sourceType: row.source_type,
         updatedAt: new Date(row.updated_at),
         url: row.url,
+        userId: row.user_id,
+        visibility: row.visibility,
       };
     });
 
@@ -441,6 +466,8 @@ export class KnowledgeRepo {
           d.content,
           d.slug,
           COALESCE(d.metadata, f.metadata) as metadata,
+          f.user_id,
+          f.visibility,
           'file' as source_type
         FROM ${files} f
         INNER JOIN ${knowledgeBaseFiles} kbf
@@ -481,6 +508,8 @@ export class KnowledgeRepo {
         d.content,
         d.slug,
         COALESCE(d.metadata, f.metadata) as metadata,
+        f.user_id,
+        f.visibility,
         'file' as source_type
       FROM ${files} f
       LEFT JOIN ${documents} d
@@ -551,6 +580,8 @@ export class KnowledgeRepo {
             NULL::text as content,
             NULL::varchar(255) as slug,
             NULL::jsonb as metadata,
+            NULL::text as user_id,
+            NULL::text as visibility,
             NULL::text as source_type
           WHERE false
         `;
@@ -642,6 +673,8 @@ export class KnowledgeRepo {
           d.content,
           d.slug,
           d.metadata,
+          d.user_id,
+          d.visibility,
           'document' as source_type
         FROM ${documents} d
         WHERE ${sql.join(kbWhereConditions, sql` AND `)}
@@ -665,6 +698,8 @@ export class KnowledgeRepo {
         content,
         slug,
         metadata,
+        user_id,
+        visibility,
         'document' as source_type
       FROM ${documents}
       WHERE ${sql.join(whereConditions, sql` AND `)}

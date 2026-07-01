@@ -830,6 +830,7 @@ table documents {
   editor_data jsonb
   slug varchar(255)
   workspace_id text
+  visibility text [not null, default: 'public']
   accessed_at "timestamp with time zone" [not null, default: `now()`]
   created_at "timestamp with time zone" [not null, default: `now()`]
   updated_at "timestamp with time zone" [not null, default: `now()`]
@@ -845,6 +846,7 @@ table documents {
     (client_id, user_id) [name: 'documents_client_id_user_id_unique', unique]
     (slug, user_id) [name: 'documents_slug_user_id_unique', unique]
     workspace_id [name: 'documents_workspace_id_idx']
+    (workspace_id, visibility, user_id) [name: 'documents_workspace_visibility_idx']
     (workspace_id, slug) [name: 'documents_slug_workspace_id_unique', unique]
   }
 }
@@ -864,6 +866,7 @@ table files {
   chunk_task_id uuid
   embedding_task_id uuid
   workspace_id text
+  visibility text [not null, default: 'public']
   accessed_at "timestamp with time zone" [not null, default: `now()`]
   created_at "timestamp with time zone" [not null, default: `now()`]
   updated_at "timestamp with time zone" [not null, default: `now()`]
@@ -876,6 +879,7 @@ table files {
     embedding_task_id [name: 'files_embedding_task_id_idx']
     (client_id, user_id) [name: 'files_client_id_user_id_unique', unique]
     workspace_id [name: 'files_workspace_id_idx']
+    (workspace_id, visibility, user_id) [name: 'files_workspace_visibility_idx']
   }
 }
 

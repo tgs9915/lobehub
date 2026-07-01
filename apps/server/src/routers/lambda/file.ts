@@ -174,6 +174,7 @@ export const fileRouter = router({
       UploadFileSchema.omit({ url: true }).extend({
         parentId: z.string().optional(),
         url: z.string(),
+        visibility: z.enum(['private', 'public']).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -182,12 +183,28 @@ export const fileRouter = router({
 
       // Resolve parentId if it's a slug
       let resolvedParentId = input.parentId;
+      let parentVisibility: 'private' | 'public' | undefined;
       if (input.parentId) {
         const docBySlug = await ctx.documentModel.findBySlug(input.parentId);
         if (docBySlug) {
           resolvedParentId = docBySlug.id;
+          parentVisibility = docBySlug.visibility;
+        } else {
+          const docById = await ctx.documentModel.findById(input.parentId);
+          if (docById) parentVisibility = docById.visibility;
         }
       }
+
+      // Visibility precedence (workspace mode only — personal mode ignores the
+      // column entirely):
+      //   1. Explicit caller value wins.
+      //   2. Otherwise inherit the parent document's visibility so a file
+      //      uploaded inside a private folder stays private.
+      //   3. Otherwise default top-level uploads to 'private' so new content
+      //      starts in the creator's private space (mirrors the Pages spec).
+      const resolvedVisibility: 'private' | 'public' | undefined = ctx.workspaceId
+        ? (input.visibility ?? parentVisibility ?? 'private')
+        : undefined;
 
       let actualSize = input.size;
       try {
@@ -254,6 +271,7 @@ export const fileRouter = router({
             parentId: resolvedParentId,
             size: actualSize,
             url: input.url,
+            ...(resolvedVisibility ? { visibility: resolvedVisibility } : {}),
           },
           // if the file is not exist in global file, create a new one
           !isExist,
@@ -322,6 +340,8 @@ export const fileRouter = router({
         sourceType: 'file' as const,
         updatedAt: item.updatedAt,
         url: await ctx.fileService.getFileAccessUrl(item),
+        userId: item.userId,
+        visibility: item.visibility,
       };
     }),
 
@@ -682,6 +702,35 @@ export const fileRouter = router({
         await ctx.fileModel.update(id, updates);
       }
 
+      return { success: true };
+    }),
+
+  publishFileToWorkspace: fileProcedure
+    .use(withScopedPermission('file:update'))
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // Personal mode has no notion of workspace visibility — publish is only
+      // meaningful inside a team workspace.
+      if (!ctx.workspaceId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Cannot publish a file outside of a workspace',
+        });
+      }
+
+      const file = await ctx.fileModel.findById(input.id);
+      if (!file) throw new TRPCError({ code: 'NOT_FOUND', message: 'File not found' });
+
+      if (file.userId !== ctx.userId) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only the creator can publish a private file to the workspace',
+        });
+      }
+
+      if (file.visibility === 'public') return { success: true };
+
+      await ctx.fileModel.publishToWorkspace(input.id);
       return { success: true };
     }),
 

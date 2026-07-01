@@ -1,0 +1,2 @@
+ALTER TABLE "documents" ADD COLUMN IF NOT EXISTS "visibility" text DEFAULT 'public' NOT NULL;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "documents_workspace_visibility_idx" ON "documents" USING btree ("workspace_id","visibility","user_id");

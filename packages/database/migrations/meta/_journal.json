@@ -826,6 +826,20 @@
       "when": 1782798307359,
       "tag": "0117_task_comments_add_visibility",
       "breakpoints": true
+    },
+    {
+      "idx": 118,
+      "version": "7",
+      "when": 1782858385075,
+      "tag": "0118_documents_add_visibility",
+      "breakpoints": true
+    },
+    {
+      "idx": 119,
+      "version": "7",
+      "when": 1782858870251,
+      "tag": "0119_files_add_visibility",
+      "breakpoints": true
     }
   ],
   "version": "6"

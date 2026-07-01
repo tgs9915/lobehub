@@ -302,9 +302,11 @@ export default {
   'members': 'Members',
   'mention.category.agents': 'Agents',
   'mention.category.members': 'Members',
+  'mention.category.privateAgents': 'Private',
   'mention.category.skills': 'Skills',
   'mention.category.tools': 'Tools',
   'mention.category.topics': 'Topics',
+  'mention.category.workspaceAgents': 'Workspace',
   'mention.title': 'Mention Members',
   'messageAction.collapse': 'Collapse Message',
   'messageAction.continueGeneration': 'Continue Generating',
@@ -452,6 +454,12 @@ export default {
   'agent.publishToWorkspaceConfirm':
     'Other workspace members will be able to use this agent. You will not be able to make it private again.',
   'agent.publishToWorkspaceSuccess': 'Published to workspace',
+  'resources.publishToWorkspace.menu': 'Publish to Workspace',
+  'resources.publishToWorkspace.confirm':
+    'Other workspace members will be able to see this file. You will not be able to make it private again.',
+  'resources.publishToWorkspace.success': 'Published to workspace',
+  'resources.publishToWorkspace.error': 'Failed to publish file to workspace',
+  'resources.visibility.privateTooltip': 'Only you can see this file',
 
   // Op status tray (floating panel above the chat input during a run)
   'opStatusTray.status.compressing': 'Compressing context',

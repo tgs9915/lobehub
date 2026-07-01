@@ -105,6 +105,7 @@ export class DocumentService {
     rawData?: string;
     slug?: string;
     title: string;
+    visibility?: 'private' | 'public';
   }): Promise<DocumentItem> {
     const {
       content,
@@ -115,6 +116,7 @@ export class DocumentService {
       knowledgeBaseId,
       parentId,
       slug,
+      visibility,
     } = params;
 
     // Calculate character and line counts
@@ -163,9 +165,29 @@ export class DocumentService {
       title,
       totalCharCount,
       totalLineCount,
+      ...(visibility ? { visibility } : {}),
     });
 
     return document;
+  }
+
+  /**
+   * Publish a private document subtree to the workspace. Thin wrapper around
+   * `DocumentModel.publishToWorkspace`, with a side-effect notification so any
+   * other workspace member with the page open (referencing chip, etc.) sees
+   * the new visibility on the next refresh.
+   */
+  async publishToWorkspace(documentId: string): Promise<{ documentIds: string[] }> {
+    const result = await this.documentModel.publishToWorkspace(documentId);
+
+    if (this.workspaceId) {
+      void publishResourceEvent(
+        { id: documentId, type: 'document' },
+        { actorId: this.userId, type: 'doc.updated' },
+      );
+    }
+
+    return result;
   }
 
   /**
@@ -182,6 +204,7 @@ export class DocumentService {
       parentId?: string;
       slug?: string;
       title: string;
+      visibility?: 'private' | 'public';
     }>,
   ): Promise<DocumentItem[]> {
     // Create all documents in parallel for better performance

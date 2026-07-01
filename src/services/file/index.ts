@@ -157,6 +157,10 @@ export class FileService {
   ) => {
     return lambdaClient.file.copyEntityToWorkspace.mutate({ entityType, id, targetWorkspaceId });
   };
+
+  publishFileToWorkspace = async (id: string): Promise<void> => {
+    await lambdaClient.file.publishFileToWorkspace.mutate({ id });
+  };
 }
 
 export const fileService = new FileService();
